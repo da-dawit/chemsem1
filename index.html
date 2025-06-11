@@ -260,11 +260,11 @@
         }
         
         @keyframes electron-flow {
-            0% { left: 15%; top: 8%; opacity: 1; transform: translateY(0); }
-            25% { left: 35%; top: 5%; transform: translateY(-5px); }
-            50% { left: 50%; top: 3%; transform: translateY(-8px); }
-            75% { left: 65%; top: 5%; transform: translateY(-5px); }
-            100% { left: 85%; top: 8%; opacity: 0.3; transform: translateY(0); }
+            0% { right: 15%; top: 8%; opacity: 1; transform: translateY(0); }
+            25% { right: 35%; top: 5%; transform: translateY(-5px); }
+            50% { right: 50%; top: 3%; transform: translateY(-8px); }
+            75% { right: 65%; top: 5%; transform: translateY(-5px); }
+            100% { right: 85%; top: 8%; opacity: 0.3; transform: translateY(0); }
         }
         
         @keyframes ion-flow-right {
@@ -866,7 +866,7 @@
                 
                 const electron = document.createElement('div');
                 electron.className = 'electron';
-                electron.style.left = '15%';
+                electron.style.right = '15%';
                 electron.style.top = '8%';
                 electron.style.animation = 'electron-flow 3s ease-out';
                 container.appendChild(electron);
