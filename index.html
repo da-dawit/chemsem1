@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electrochemical Cell Simulation: MnO₄⁻/Fe²⁺ Redox System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0f1419;
+            color: #ffffff;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #3d5a99;
+        }
+        
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 600;
+            margin-bottom: 5px;
+            letter-spacing: -0.5px;
+        }
+        
+        .header .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+            height: calc(100vh - 120px);
+        }
+        
+        .simulation-panel {
+            padding: 25px;
+            background: #1a1f2e;
+            border-right: 2px solid #2d3548;
+        }
+        
+        .control-panel {
+            background: #161b26;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .reaction-equations {
+            background: #252b3a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid #3d4757;
+        }
+        
+        .equation-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #64b5f6;
+        }
+        
+        .equation {
+            font-family: 'JetBrains Mono', 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            color: #e1e5f2;
+            margin-bottom: 8px;
+        }
+        
+        .cell-container {
+            position: relative;
+            height: 320px;
+            background: #252b3a;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid #3d4757;
+        }
+        
+        .electrode-assembly {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            height: 100%;
+            position: relative;
+            padding: 0 40px;
+        }
+        
+        .half-cell {
+            width: 140px;
+            height: 220px;
+            position: relative;
+        }
+        
+        .beaker {
+            width: 100%;
+            height: 180px;
+            border: 3px solid #64b5f6;
+            border-radius: 0 0 25px 25px;
+            position: relative;
+            overflow: hidden;
+            background: rgba(100, 181, 246, 0.05);
+        }
+        
+        .electrode {
+            position: absolute;
+            width: 8px;
+            height: 140px;
+            background: linear-gradient(180deg, #ffd700, #ffb300);
+            left: 50%;
+            transform: translateX(-50%);
+            top: -40px;
+            border-radius: 4px;
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+        }
+        
+        .solution {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 140px;
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 0 0 22px 22px;
+        }
+        
+        .cathode-solution {
+            background: linear-gradient(180deg, #7b1fa2, #4a148c);
+            box-shadow: inset 0 0 20px rgba(123, 31, 162, 0.3);
+        }
+        
+        .anode-solution {
+            background: linear-gradient(180deg, #388e3c, #1b5e20);
+            box-shadow: inset 0 0 20px rgba(56, 142, 60, 0.3);
+        }
+        
+        .mixed-solution {
+            background: linear-gradient(180deg, #f57c00, #e65100);
+            box-shadow: inset 0 0 20px rgba(245, 124, 0, 0.3);
+        }
+        
+        .cell-label {
+            position: absolute;
+            bottom: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-weight: 600;
+            font-size: 0.95em;
+            color: #64b5f6;
+            text-align: center;
+        }
+        
+        .external-circuit {
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 240px;
+            height: 80px;
+            opacity: 0;
+            transition: all 0.5s ease;
+            z-index: 10;
+        }
+        
+        .external-circuit::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 4px solid #ffd700;
+            border-bottom: none;
+            border-radius: 40px 40px 0 0;
+            background: none;
+            box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+        }
+        
+        .external-circuit.active {
+            opacity: 1;
+        }
+        
+        .external-circuit.active::before {
+            animation: circuit-glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes circuit-glow {
+            0% { box-shadow: 0 0 12px rgba(255, 215, 0, 0.4); }
+            100% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); }
+        }
+        
+        .salt-bridge {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 80px;
+            opacity: 0;
+            transition: all 0.5s ease;
+            z-index: 5;
+        }
+        
+        .salt-bridge::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 3px solid #6b7280;
+            border-bottom: none;
+            border-radius: 40px 40px 0 0;
+            background: linear-gradient(180deg, #9ca3af 0%, #6b7280 70%, transparent 100%);
+        }
+        
+        .salt-bridge.active {
+            opacity: 1;
+        }
+        
+        .salt-bridge.active::before {
+            box-shadow: 0 0 15px rgba(107, 114, 128, 0.5);
+        }
+        
+        .electron {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: radial-gradient(circle, #ffff00, #ffd700);
+            border-radius: 50%;
+            box-shadow: 0 0 8px #ffff00;
+            z-index: 10;
+        }
+        
+        .ion {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            z-index: 5;
+        }
+        
+        .cation {
+            background: radial-gradient(circle, #ff5722, #d84315);
+            box-shadow: 0 0 6px #ff5722;
+        }
+        
+        .anion {
+            background: radial-gradient(circle, #00bcd4, #0097a7);
+            box-shadow: 0 0 6px #00bcd4;
+        }
+        
+        @keyframes electron-flow {
+            0% { left: 15%; top: 8%; opacity: 1; transform: translateY(0); }
+            25% { left: 35%; top: 5%; transform: translateY(-5px); }
+            50% { left: 50%; top: 3%; transform: translateY(-8px); }
+            75% { left: 65%; top: 5%; transform: translateY(-5px); }
+            100% { left: 85%; top: 8%; opacity: 0.3; transform: translateY(0); }
+        }
+        
+        @keyframes ion-flow-right {
+            0% { left: 25%; top: 45%; opacity: 1; }
+            25% { left: 35%; top: 35%; }
+            50% { left: 50%; top: 30%; }
+            75% { left: 65%; top: 35%; }
+            100% { left: 75%; top: 45%; opacity: 0.3; }
+        }
+        
+        @keyframes ion-flow-left {
+            0% { right: 25%; top: 50%; opacity: 1; }
+            25% { right: 35%; top: 40%; }
+            50% { right: 50%; top: 35%; }
+            75% { right: 65%; top: 40%; }
+            100% { right: 75%; top: 50%; opacity: 0.3; }
+        }
+        
+        .mode-selector {
+            margin-bottom: 25px;
+        }
+        
+        .mode-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #64b5f6;
+        }
+        
+        .mode-button {
+            display: block;
+            width: 100%;
+            padding: 15px 20px;
+            margin-bottom: 12px;
+            background: #252b3a;
+            border: 2px solid #3d4757;
+            border-radius: 10px;
+            color: #ffffff;
+            font-size: 0.95em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+        
+        .mode-button:hover {
+            border-color: #64b5f6;
+            background: #2d3548;
+            transform: translateY(-1px);
+        }
+        
+        .mode-button.active {
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            border-color: #64b5f6;
+            box-shadow: 0 4px 12px rgba(30, 60, 114, 0.3);
+        }
+        
+        .metrics-panel {
+            background: #252b3a;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid #3d4757;
+        }
+        
+        .metrics-title {
+            font-size: 1em;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #64b5f6;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 6px 0;
+            border-bottom: 1px solid #3d4757;
+        }
+        
+        .metric:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        
+        .metric-label {
+            font-size: 0.85em;
+            color: #b0bec5;
+        }
+        
+        .metric-value {
+            font-size: 1em;
+            font-weight: 600;
+            color: #ffffff;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .chart-container {
+            background: #252b3a;
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid #3d4757;
+            height: 250px;
+            margin-bottom: 15px;
+        }
+        
+        .chart-title {
+            font-size: 1em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #64b5f6;
+            text-align: center;
+        }
+        
+        .status-indicator {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-inactive {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+            border: 1px solid #ffc107;
+        }
+        
+        .status-limited {
+            background: rgba(255, 152, 0, 0.2);
+            color: #ff9800;
+            border: 1px solid #ff9800;
+        }
+        
+        .status-active {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid #4caf50;
+        }
+        
+        .heat-indicator {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 1.5em;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            filter: drop-shadow(0 0 8px #ff5722);
+        }
+        
+        .heat-indicator.active {
+            opacity: 1;
+            animation: heat-pulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes heat-pulse {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px #ff5722); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 12px #ff5722); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Electrochemical Cell Analysis</h1>
+        <div class="subtitle">MnO₄⁻ + Fe²⁺ Redox System: Direct vs. Galvanic Configuration</div>
+    </div>
+    
+    <div class="main-container">
+        <div class="simulation-panel">
+            <div class="reaction-equations">
+                <div class="equation-title">Redox Half-Reactions</div>
+                <div class="equation"><strong>Cathode (Reduction):</strong> MnO₄⁻ + 8H⁺ + 5e⁻ → Mn²⁺ + 4H₂O  &nbsp;&nbsp; E° = +1.51 V</div>
+                <div class="equation"><strong>Anode (Oxidation):</strong> Fe²⁺ → Fe³⁺ + e⁻  &nbsp;&nbsp; E° = -0.77 V</div>
+                <div class="equation"><strong>Overall Reaction:</strong> MnO₄⁻ + 5Fe²⁺ + 8H⁺ → Mn²⁺ + 5Fe³⁺ + 4H₂O</div>
+                <div class="equation"><strong>Standard Cell Potential:</strong> E°<sub>cell</sub> = 1.51 - (-0.77) = 2.28 V</div>
+            </div>
+            
+            <div class="cell-container">
+                <div class="status-indicator" id="statusIndicator">Inactive</div>
+                <div class="heat-indicator" id="heatIndicator">🌡️</div>
+                
+                <div class="electrode-assembly">
+                    <div class="half-cell">
+                        <div class="beaker">
+                            <div class="electrode"></div>
+                            <div class="solution cathode-solution" id="cathodeSolution"></div>
+                        </div>
+                        <div class="cell-label" id="cathodeLabel">MnO₄⁻ / Mn²⁺<br>Cathode</div>
+                    </div>
+                    
+                    <div class="half-cell">
+                        <div class="beaker">
+                            <div class="electrode"></div>
+                            <div class="solution anode-solution" id="anodeSolution"></div>
+                        </div>
+                        <div class="cell-label" id="anodeLabel">Fe²⁺ / Fe³⁺<br>Anode</div>
+                    </div>
+                </div>
+                
+                <div class="external-circuit" id="externalCircuit"></div>
+                <div class="salt-bridge" id="saltBridge"></div>
+            </div>
+        </div>
+        
+        <div class="control-panel">
+            <div class="mode-selector">
+                <div class="mode-title">Cell Configuration</div>
+                <button class="mode-button" id="directBtn" onclick="setDirectReaction()">
+                    <strong>Direct Mixing</strong><br>
+                    <small>Reactants in single container</small>
+                </button>
+                <button class="mode-button" id="separatedBtn" onclick="setSeparatedReaction()">
+                    <strong>External Circuit Only</strong><br>
+                    <small>Wire connection, no salt bridge</small>
+                </button>
+                <button class="mode-button" id="galvanicBtn" onclick="setGalvanicCell()">
+                    <strong>Complete Galvanic Cell</strong><br>
+                    <small>Wire + salt bridge</small>
+                </button>
+            </div>
+            
+            <div class="metrics-panel">
+                <div class="metrics-title">Real-time Measurements</div>
+                <div class="metric">
+                    <span class="metric-label">Current (I)</span>
+                    <span class="metric-value" id="currentValue">0.00 A</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Voltage (V)</span>
+                    <span class="metric-value" id="voltageValue">0.00 V</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Power (P)</span>
+                    <span class="metric-value" id="powerValue">0.00 W</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Charge Imbalance</span>
+                    <span class="metric-value" id="chargeValue">0.00 C</span>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Current vs Time</div>
+                <canvas id="currentChart"></canvas>
+            </div>
+            
+            <div class="chart-container">
+                <div class="chart-title">Charge Imbalance vs Time</div>
+                <canvas id="chargeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = '';
+        let electronInterval, ionInterval, dataInterval;
+        let startTime = Date.now();
+        let currentChart, chargeChart;
+        let currentValue = 0;
+        let voltageValue = 0;
+        let chargeImbalance = 0;
+        
+        // Initialize Charts
+        const ctx = document.getElementById('currentChart').getContext('2d');
+        currentChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Current (A)',
+                    data: [],
+                    borderColor: '#64b5f6',
+                    backgroundColor: 'rgba(100, 181, 246, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: 'Time (s)',
+                            color: '#b0bec5'
+                        },
+                        grid: {
+                            color: '#3d4757'
+                        },
+                        ticks: {
+                            color: '#b0bec5'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Current (A)',
+                            color: '#b0bec5'
+                        },
+                        grid: {
+                            color: '#3d4757'
+                        },
+                        ticks: {
+                            color: '#b0bec5'
+                        },
+                        min: 0,
+                        max: 2
+                    }
+                },
+                elements: {
+                    point: {
+                        backgroundColor: '#64b5f6'
+                    }
+                }
+            }
+        });
+
+        const chargeCtx = document.getElementById('chargeChart').getContext('2d');
+        chargeChart = new Chart(chargeCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Charge Imbalance (C)',
+                    data: [],
+                    borderColor: '#ff5722',
+                    backgroundColor: 'rgba(255, 87, 34, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'linear',
+                        title: {
+                            display: true,
+                            text: 'Time (s)',
+                            color: '#b0bec5'
+                        },
+                        grid: {
+                            color: '#3d4757'
+                        },
+                        ticks: {
+                            color: '#b0bec5'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Charge Imbalance (C)',
+                            color: '#b0bec5'
+                        },
+                        grid: {
+                            color: '#3d4757'
+                        },
+                        ticks: {
+                            color: '#b0bec5'
+                        },
+                        min: -0.5,
+                        max: 2.5
+                    }
+                },
+                elements: {
+                    point: {
+                        backgroundColor: '#ff5722'
+                    }
+                }
+            }
+        });
+        
+        function clearAnimations() {
+            if (electronInterval) clearInterval(electronInterval);
+            if (ionInterval) clearInterval(ionInterval);
+            if (dataInterval) clearInterval(dataInterval);
+            
+            document.querySelectorAll('.electron, .ion').forEach(el => el.remove());
+        }
+        
+        function updateChart(time, current, charge) {
+            const timeInSeconds = time / 1000;
+            
+            // Ensure charge is a valid number
+            const chargeValue = typeof charge === 'number' ? charge : 0;
+            
+            // Update current chart
+            currentChart.data.labels.push(timeInSeconds);
+            currentChart.data.datasets[0].data.push(current);
+            
+            // Update charge chart
+            chargeChart.data.labels.push(timeInSeconds);
+            chargeChart.data.datasets[0].data.push(chargeValue);
+            
+            // Keep only last 30 data points
+            if (currentChart.data.labels.length > 30) {
+                currentChart.data.labels.shift();
+                currentChart.data.datasets[0].data.shift();
+                chargeChart.data.labels.shift();
+                chargeChart.data.datasets[0].data.shift();
+            }
+            
+            currentChart.update('none');
+            chargeChart.update('none');
+        }
+        
+        function updateMetrics(current, voltage, charge) {
+            currentValue = current;
+            voltageValue = voltage;
+            chargeImbalance = charge;
+            const power = current * voltage;
+            
+            document.getElementById('currentValue').textContent = current.toFixed(2) + ' A';
+            document.getElementById('voltageValue').textContent = voltage.toFixed(2) + ' V';
+            document.getElementById('powerValue').textContent = power.toFixed(2) + ' W';
+            document.getElementById('chargeValue').textContent = (typeof charge === 'number' ? charge : 0).toFixed(2) + ' C';
+        }
+        
+        function setDirectReaction() {
+            clearAnimations();
+            currentMode = 'direct';
+            startTime = Date.now();
+            
+            // Reset charts
+            currentChart.data.labels = [];
+            currentChart.data.datasets[0].data = [];
+            chargeChart.data.labels = [];
+            chargeChart.data.datasets[0].data = [];
+            currentChart.update();
+            chargeChart.update();
+            
+            // Update UI
+            document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('directBtn').classList.add('active');
+            
+            // Hide circuit elements
+            document.getElementById('externalCircuit').classList.remove('active');
+            document.getElementById('saltBridge').classList.remove('active');
+            
+            // Change to mixed solution
+            setTimeout(() => {
+                document.getElementById('cathodeSolution').className = 'solution mixed-solution';
+                document.getElementById('anodeSolution').className = 'solution mixed-solution';
+                document.getElementById('cathodeLabel').innerHTML = 'Mixed Reactants<br>& Products';
+                document.getElementById('anodeLabel').innerHTML = 'Heat Generation<br>No Work';
+            }, 500);
+            
+            // Show heat and status
+            document.getElementById('heatIndicator').classList.add('active');
+            document.getElementById('statusIndicator').className = 'status-indicator status-inactive';
+            document.getElementById('statusIndicator').textContent = 'Heat Only';
+            
+            // Simulate data - no charge imbalance in direct mixing
+            dataInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                updateChart(elapsed, 0, 0);
+                updateMetrics(0, 0, 0);
+            }, 100);
+        }
+        
+        function setSeparatedReaction() {
+            clearAnimations();
+            currentMode = 'separated';
+            startTime = Date.now();
+            
+            // Reset charts
+            currentChart.data.labels = [];
+            currentChart.data.datasets[0].data = [];
+            chargeChart.data.labels = [];
+            chargeChart.data.datasets[0].data = [];
+            currentChart.update();
+            chargeChart.update();
+            
+            // Update UI
+            document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('separatedBtn').classList.add('active');
+            
+            // Reset solutions
+            document.getElementById('cathodeSolution').className = 'solution cathode-solution';
+            document.getElementById('anodeSolution').className = 'solution anode-solution';
+            document.getElementById('cathodeLabel').innerHTML = 'MnO₄⁻ / Mn²⁺<br>Cathode';
+            document.getElementById('anodeLabel').innerHTML = 'Fe²⁺ / Fe³⁺<br>Anode';
+            
+            // Show only external circuit
+            document.getElementById('externalCircuit').classList.add('active');
+            document.getElementById('saltBridge').classList.remove('active');
+            
+            // Hide heat
+            document.getElementById('heatIndicator').classList.remove('active');
+            document.getElementById('statusIndicator').className = 'status-indicator status-limited';
+            document.getElementById('statusIndicator').textContent = 'Limited';
+            
+            // Simulate initial current spike then decay due to charge buildup
+            let currentSpike = 1.2;
+            let chargeBuildup = 0;
+            dataInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const timeSeconds = elapsed / 1000;
+                
+                if (timeSeconds < 3) {
+                    // Current decreases as charge builds up
+                    currentSpike *= 0.92; // Exponential decay
+                    chargeBuildup += 0.15; // Charge accumulates
+                } else {
+                    currentSpike = 0.02; // Almost zero current
+                    chargeBuildup = Math.min(chargeBuildup + 0.02, 2.0); // Plateaus at high charge
+                }
+                
+                updateChart(elapsed, currentSpike, chargeBuildup);
+                updateMetrics(currentSpike, timeSeconds < 2 ? 2.28 * (currentSpike/1.2) : 0.1, chargeBuildup);
+            }, 100);
+            
+            startElectronFlow(true); // Limited flow
+        }
+        
+        function setGalvanicCell() {
+            clearAnimations();
+            currentMode = 'galvanic';
+            startTime = Date.now();
+            
+            // Reset charts
+            currentChart.data.labels = [];
+            currentChart.data.datasets[0].data = [];
+            chargeChart.data.labels = [];
+            chargeChart.data.datasets[0].data = [];
+            currentChart.update();
+            chargeChart.update();
+            
+            // Update UI
+            document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('galvanicBtn').classList.add('active');
+            
+            // Reset solutions
+            document.getElementById('cathodeSolution').className = 'solution cathode-solution';
+            document.getElementById('anodeSolution').className = 'solution anode-solution';
+            document.getElementById('cathodeLabel').innerHTML = 'MnO₄⁻ / Mn²⁺<br>Cathode';
+            document.getElementById('anodeLabel').innerHTML = 'Fe²⁺ / Fe³⁺<br>Anode';
+            
+            // Show both circuit elements
+            document.getElementById('externalCircuit').classList.add('active');
+            document.getElementById('saltBridge').classList.add('active');
+            
+            // Hide heat
+            document.getElementById('heatIndicator').classList.remove('active');
+            document.getElementById('statusIndicator').className = 'status-indicator status-active';
+            document.getElementById('statusIndicator').textContent = 'Active';
+            
+            // Simulate sustained current with minimal charge imbalance
+            const sustainedCurrent = 1.5;
+            dataInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const timeSeconds = elapsed / 1000;
+                
+                // Add slight variation for realism
+                const variation = 0.05 * Math.sin(timeSeconds * 2) * Math.random();
+                const current = sustainedCurrent + variation;
+                
+                // Salt bridge maintains near-zero charge imbalance
+                const chargeVariation = 0.02 * Math.sin(timeSeconds * 3) * Math.random();
+                
+                updateChart(elapsed, current, chargeVariation);
+                updateMetrics(current, 2.28, chargeVariation);
+            }, 100);
+            
+            startElectronFlow(false); // Sustained flow
+            startIonFlow();
+        }
+        
+        function startElectronFlow(limited = false) {
+            const container = document.querySelector('.cell-container');
+            const interval = limited ? 800 : 400;
+            
+            electronInterval = setInterval(() => {
+                if (limited && Math.random() > 0.3) return; // Intermittent flow
+                
+                const electron = document.createElement('div');
+                electron.className = 'electron';
+                electron.style.left = '15%';
+                electron.style.top = '8%';
+                electron.style.animation = 'electron-flow 3s ease-out';
+                container.appendChild(electron);
+                
+                setTimeout(() => {
+                    if (electron.parentNode) {
+                        electron.parentNode.removeChild(electron);
+                    }
+                }, 3000);
+            }, interval);
+        }
+        
+        function startIonFlow() {
+            const container = document.querySelector('.cell-container');
+            
+            ionInterval = setInterval(() => {
+                // Cations moving right through salt bridge
+                const cation = document.createElement('div');
+                cation.className = 'ion cation';
+                cation.style.left = '25%';
+                cation.style.top = '45%';
+                cation.style.animation = 'ion-flow-right 4s linear';
+                container.appendChild(cation);
+                
+                // Anions moving left through salt bridge
+                const anion = document.createElement('div');
+                anion.className = 'ion anion';
+                anion.style.right = '25%';
+                anion.style.top = '50%';
+                anion.style.animation = 'ion-flow-left 4s linear';
+                container.appendChild(anion);
+                
+                setTimeout(() => {
+                    if (cation.parentNode) cation.parentNode.removeChild(cation);
+                    if (anion.parentNode) anion.parentNode.removeChild(anion);
+                }, 4000);
+            }, 800);
+        }
+        
+        // Initialize with direct reaction
+        setDirectReaction();
+    </script>
+</body>
+</html>
